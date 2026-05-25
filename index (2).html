@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game Acak Kata</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles for animations and aesthetics */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0fdf4; /* Light green background */
+        }
+        
+        .letter-btn {
+            transition: all 0.2s ease-in-out;
+        }
+        
+        .letter-btn:hover:not(:disabled) {
+            transform: scale(1.1);
+        }
+        
+        .letter-btn:active:not(:disabled) {
+            transform: scale(0.95);
+        }
+        
+        .shake {
+            animation: shake 0.5s;
+        }
+        
+        @keyframes shake {
+            0% { transform: translateX(0); }
+            25% { transform: translateX(-5px); }
+            50% { transform: translateX(5px); }
+            75% { transform: translateX(-5px); }
+            100% { transform: translateX(0); }
+        }
+
+        .success-pop {
+            animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        @keyframes popIn {
+            0% { transform: scale(0.8); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+    </style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-4">
+
+    <div class="max-w-md w-full bg-white rounded-3xl shadow-xl overflow-hidden border-2 border-green-200">
+        <!-- Header -->
+        <div class="bg-green-500 p-6 text-white text-center rounded-t-2xl relative">
+            <h1 class="text-3xl font-bold mb-2">Acak Kata</h1>
+            <p class="text-green-100">Susun huruf menjadi kata yang benar!</p>
+            
+            <!-- Progress / Score -->
+            <div class="absolute top-4 right-4 bg-green-600 px-3 py-1 rounded-full text-sm font-bold">
+                <span id="scoreDisplay">0</span> / 10
+            </div>
+        </div>
+
+        <!-- Game Area -->
+        <div class="p-8">
+            
+            <!-- Question Box -->
+            <div id="questionContainer" class="mb-8 text-center">
+                <h2 class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2">Soal:</h2>
+                <p id="questionText" class="text-xl font-medium text-gray-800 bg-green-50 p-4 rounded-xl border border-green-100">
+                    Memuat pertanyaan...
+                </p>
+            </div>
+
+            <!-- Answer Slots -->
+            <div class="mb-8">
+                <p class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2 text-center">Jawabanmu:</p>
+                <div id="answerSlots" class="flex flex-wrap justify-center gap-2 min-h-[60px]">
+                    <!-- Slots will be injected here by JS -->
+                </div>
+            </div>
+
+            <!-- Jumbled Letters -->
+            <div class="mb-8">
+                <p class="text-sm font-semibold text-gray-500 uppercase tracking-wider mb-2 text-center">Pilih Huruf:</p>
+                <div id="jumbledLetters" class="flex flex-wrap justify-center gap-3">
+                    <!-- Letters will be injected here by JS -->
+                </div>
+            </div>
+
+            <!-- Controls -->
+            <div class="flex gap-4 justify-center">
+                <button id="resetBtn" class="flex-1 bg-red-100 hover:bg-red-200 text-red-600 font-bold py-3 px-6 rounded-xl transition duration-200 shadow-sm border border-red-200">
+                    Hapus
+                </button>
+                <button id="checkBtn" class="flex-1 bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-xl transition duration-200 shadow-md shadow-green-200" disabled>
+                    Cek
+                </button>
+            </div>
+
+            <!-- Message Area (Success/Error) -->
+            <div id="messageArea" class="mt-6 text-center hidden">
+                <!-- Content injected by JS -->
+            </div>
+            
+             <!-- Next Button (Hidden by default) -->
+             <button id="nextBtn" class="w-full mt-4 bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 px-6 rounded-xl transition duration-200 shadow-md shadow-blue-200 hidden">
+                Lanjut ke Soal Berikutnya
+            </button>
+
+        </div>
+        
+        <!-- End Screen (Hidden by default) -->
+        <div id="endScreen" class="hidden p-8 text-center flex flex-col items-center justify-center min-h-[400px]">
+            <div class="text-6xl mb-4">🏆</div>
+            <h2 class="text-3xl font-bold text-green-600 mb-2">Selamat!</h2>
+            <p class="text-gray-600 mb-6">Kamu berhasil menyelesaikan semua soal.</p>
+            <div class="text-2xl font-bold bg-green-100 text-green-800 py-3 px-6 rounded-full mb-8">
+                Skor Akhir: 10 / 10
+            </div>
+            <button onclick="startGame()" class="bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-8 rounded-xl transition duration-200 shadow-md shadow-green-200 w-full">
+                Main Lagi
+            </button>
+        </div>
+
+    </div>
+
+    <script>
+        // Database of Questions
+        const questionsList = [
+            { question: "Apa nama bagian tubuh yang berfungsi untuk melihat?", answer: "MATA", jumbled: "TAMA" },
+            { question: "Benda langit yang bersinar di siang hari adalah?", answer: "MATAHARI", jumbled: "AHRAIMTA" },
+            { question: "Hewan peliharaan yang suka mengeong adalah?", answer: "KUCING", jumbled: "GCKNIU" },
+            { question: "Alat tulis yang digunakan dengan tinta adalah?", answer: "PULPEN", jumbled: "NPLUPE" },
+            { question: "Rasa gula yang biasa kita makan adalah?", answer: "MANIS", jumbled: "SNAMI" },
+            { question: "Kendaraan yang berjalan di atas rel besi adalah?", answer: "KERETA", jumbled: "TEKARE" },
+            { question: "Tempat siswa belajar bersama guru adalah?", answer: "SEKOLAH", jumbled: "HOKLEAS" },
+            { question: "Buah berwarna kuning yang bentuknya melengkung panjang?", answer: "PISANG", jumbled: "GNIPAS" },
+            { question: "Warna daun yang sehat pada umumnya adalah?", answer: "HIJAU", jumbled: "UJAHI" },
+            { question: "Alat untuk melindungi diri dari hujan selain jas hujan?", answer: "PAYUNG", jumbled: "NGUPYA" }
+        ];
+
+        // Game State Variables
+        let currentQuestionIndex = 0;
+        let score = 0;
+        let currentAnswer = []; // Array to store user's current selected letters
+        let availableLetters = []; // Array of letters from jumbled string
+        let questions = []; // Array to hold shuffled questions
+
+        // DOM Elements
+        const questionTextEl = document.getElementById('questionText');
+        const answerSlotsEl = document.getElementById('answerSlots');
+        const jumbledLettersEl = document.getElementById('jumbledLetters');
+        const resetBtn = document.getElementById('resetBtn');
+        const checkBtn = document.getElementById('checkBtn');
+        const messageArea = document.getElementById('messageArea');
+        const nextBtn = document.getElementById('nextBtn');
+        const scoreDisplay = document.getElementById('scoreDisplay');
+        const gameContainer = document.querySelector('.p-8');
+        const endScreen = document.getElementById('endScreen');
+
+        // Initialize Game
+        function startGame() {
+            // Reset state
+            currentQuestionIndex = 0;
+            score = 0;
+            scoreDisplay.textContent = score;
+            
+            // Shuffle questions to make it random but we will use all 10
+            questions = [...questionsList].sort(() => Math.random() - 0.5);
+            
+            // Show Game Area, Hide End Screen
+            gameContainer.classList.remove('hidden');
+            endScreen.classList.add('hidden');
+
+            loadQuestion();
+        }
+
+        // Load a specific question
+        function loadQuestion() {
+            // Reset current answer
+            currentAnswer = [];
+            
+            const q = questions[currentQuestionIndex];
+            
+            // Set Text
+            questionTextEl.textContent = q.question;
+            
+            // Setup Letters array (splitting the string)
+            availableLetters = q.jumbled.split('').map((char, index) => ({
+                id: `letter-${index}`,
+                char: char,
+                used: false
+            }));
+
+            // Hide messages and next button
+            hideMessage();
+            nextBtn.classList.add('hidden');
+            
+            // Reset buttons
+            checkBtn.disabled = true;
+            checkBtn.classList.replace('bg-green-500', 'bg-gray-300');
+            checkBtn.classList.replace('text-white', 'text-gray-500');
+            checkBtn.classList.remove('hover:bg-green-600', 'shadow-md', 'shadow-green-200');
+
+            renderUI();
+        }
+
+        // Main function to update the DOM based on state
+        function renderUI() {
+            renderAnswerSlots();
+            renderJumbledLetters();
+            updateCheckButtonState();
+        }
+
+        // Render the slots where user answers go
+        function renderAnswerSlots() {
+            const targetLength = questions[currentQuestionIndex].answer.length;
+            answerSlotsEl.innerHTML = '';
+
+            for (let i = 0; i < targetLength; i++) {
+                const slot = document.createElement('div');
+                slot.className = 'w-12 h-14 bg-gray-100 rounded-lg flex items-center justify-center text-2xl font-bold text-gray-800 border-2 border-dashed border-gray-300 shadow-inner';
+                
+                if (currentAnswer[i]) {
+                    // Filled slot
+                    slot.textContent = currentAnswer[i].char;
+                    slot.className = 'w-12 h-14 bg-green-50 rounded-lg flex items-center justify-center text-2xl font-bold text-green-700 border-2 border-green-300 shadow-sm cursor-pointer success-pop';
+                    // Allow clicking a filled slot to remove it
+                    const letterObj = currentAnswer[i];
+                    slot.onclick = () => removeLetter(letterObj);
+                }
+
+                answerSlotsEl.appendChild(slot);
+            }
+        }
+
+        // Render the buttons for jumbled letters
+        function renderJumbledLetters() {
+            jumbledLettersEl.innerHTML = '';
+
+            availableLetters.forEach(letter => {
+                const btn = document.createElement('button');
+                btn.className = `letter-btn w-12 h-12 rounded-full text-xl font-bold flex items-center justify-center shadow-md transition-all
+                    ${letter.used 
+                        ? 'bg-gray-200 text-gray-400 opacity-50 cursor-not-allowed border border-gray-300' 
+                        : 'bg-white text-blue-600 border-2 border-blue-200 hover:border-blue-400 hover:bg-blue-50 cursor-pointer'}`;
+                
+                btn.textContent = letter.char;
+                btn.disabled = letter.used;
+                
+                if (!letter.used) {
+                    btn.onclick = () => addLetter(letter);
+                }
+
+                jumbledLettersEl.appendChild(btn);
+            });
+        }
+
+        // Action: User clicks a jumbled letter
+        function addLetter(letterObj) {
+            const targetLength = questions[currentQuestionIndex].answer.length;
+            if (currentAnswer.length < targetLength) {
+                // Add to answer array
+                currentAnswer.push(letterObj);
+                // Mark as used
+                letterObj.used = true;
+                // Update UI
+                renderUI();
+            }
+        }
+
+        // Action: User clicks a letter in the answer slot to return it
+        function removeLetter(letterObj) {
+            // Find in currentAnswer and remove
+            const index = currentAnswer.findIndex(item => item.id === letterObj.id);
+            if (index > -1) {
+                currentAnswer.splice(index, 1);
+                
+                // Find in availableLetters and mark unused
+                const originalLetter = availableLetters.find(item => item.id === letterObj.id);
+                if (originalLetter) {
+                    originalLetter.used = false;
+                }
+                renderUI();
+            }
+        }
+
+        // Action: Reset button clicked
+        resetBtn.addEventListener('click', () => {
+            currentAnswer = [];
+            availableLetters.forEach(l => l.used = false);
+            renderUI();
+            hideMessage();
+        });
+
+        // Update Check Button visually
+        function updateCheckButtonState() {
+            const isFull = currentAnswer.length === questions[currentQuestionIndex].answer.length;
+            checkBtn.disabled = !isFull;
+            
+            if (isFull) {
+                checkBtn.classList.replace('bg-gray-300', 'bg-green-500');
+                checkBtn.classList.replace('text-gray-500', 'text-white');
+                checkBtn.classList.add('hover:bg-green-600', 'shadow-md', 'shadow-green-200');
+            } else {
+                checkBtn.classList.replace('bg-green-500', 'bg-gray-300');
+                checkBtn.classList.replace('text-white', 'text-gray-500');
+                checkBtn.classList.remove('hover:bg-green-600', 'shadow-md', 'shadow-green-200');
+            }
+        }
+
+        // Action: Check Button clicked
+        checkBtn.addEventListener('click', () => {
+            const userAnswer = currentAnswer.map(item => item.char).join('');
+            const correctAnswer = questions[currentQuestionIndex].answer;
+
+            if (userAnswer === correctAnswer) {
+                handleCorrectAnswer();
+            } else {
+                handleWrongAnswer();
+            }
+        });
+
+        function handleCorrectAnswer() {
+            // Show Success Message
+            messageArea.innerHTML = `
+                <div class="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-xl relative success-pop">
+                    <strong class="font-bold">Benar! 🎉</strong>
+                    <span class="block sm:inline">Jawabanmu tepat sekali.</span>
+                </div>
+            `;
+            messageArea.classList.remove('hidden');
+            
+            // Disable interactions
+            jumbledLettersEl.querySelectorAll('button').forEach(btn => btn.disabled = true);
+            answerSlotsEl.querySelectorAll('div').forEach(div => div.onclick = null);
+            checkBtn.disabled = true;
+            resetBtn.disabled = true;
+
+            // Show Next Button
+            nextBtn.classList.remove('hidden');
+            
+            // Update Score
+            score++;
+            scoreDisplay.textContent = score;
+        }
+
+        function handleWrongAnswer() {
+             // Show Error Message
+             messageArea.innerHTML = `
+                <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-xl relative shake">
+                    <strong class="font-bold">Oops! 🙁</strong>
+                    <span class="block sm:inline">Coba susun lagi ya.</span>
+                </div>
+            `;
+            messageArea.classList.remove('hidden');
+
+            // Shake answer slots visually
+            answerSlotsEl.classList.add('shake');
+            setTimeout(() => {
+                answerSlotsEl.classList.remove('shake');
+            }, 500);
+        }
+
+        function hideMessage() {
+            messageArea.classList.add('hidden');
+            messageArea.innerHTML = '';
+        }
+
+        // Action: Next Button clicked
+        nextBtn.addEventListener('click', () => {
+            currentQuestionIndex++;
+            resetBtn.disabled = false;
+            
+            if (currentQuestionIndex < questions.length) {
+                loadQuestion();
+            } else {
+                showEndScreen();
+            }
+        });
+
+        function showEndScreen() {
+            gameContainer.classList.add('hidden');
+            endScreen.classList.remove('hidden');
+        }
+
+        // Initialize on load
+        window.onload = startGame;
+
+    </script>
+</body>
+</html>
